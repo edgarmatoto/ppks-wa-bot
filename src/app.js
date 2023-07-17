@@ -1,16 +1,28 @@
 require("dotenv").config();
 
-const qrcode = require("qrcode-terminal");
+const QRCode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 
 const handleMessage = require('./handler/messageHandler');
 
 const edgar = new Client({
   authStrategy: new LocalAuth(),
+  puppeteer: {
+    headless: true,
+    args: [
+      "--disable-gpu",
+      "--disable-dev-shm-usage",
+      "--disable-setuid-sandbox",
+      "--no-sandbox",
+    ],
+  },
 });
 
 edgar.on("qr", (qr) => {
-  qrcode.generate(qr, { small: true });
+  QRCode.toFile('whatsapp_qr/qr-image.svg', qr, { type: 'svg' }, (err) => {
+    if (err) throw err;
+    console.log('qr generated!');
+  });
 });
 
 edgar.on("ready", () => {
