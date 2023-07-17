@@ -2,3 +2,5 @@
 node_modules
 .wwebjs_auth
 .wwebjs_cache
+./whatsapp_qr/qr-image.svg
+./whatsapp_qr/qr.html
