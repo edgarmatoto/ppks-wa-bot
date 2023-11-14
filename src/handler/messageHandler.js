@@ -1,9 +1,11 @@
 const DatabaseService = require('../service/DatabaseService');
+const EmailService = require('../service/EmailService');
 
 async function handleMessage(client, message) {
   const messageBody = message.body.toLowerCase();
 
   const greetingKeywords = ["hi", "hello", "halo", 'hai', 'helo', 'p', 'menu', '/menu', 'layanan'];
+
   const serviceOptions = [
     "pengaduan laporan kekerasan seksual.",
     "bimbingan konseling dengan satgas ppks.",
@@ -13,38 +15,76 @@ async function handleMessage(client, message) {
 
   //  handle message
   if (greetingKeywords.includes(messageBody)) {
-    const userContact = await message.getContact();
-    const userName = userContact.pushname;
+    const user = await message.getContact();
+    const username = user.pushname;
 
     message.react('👍');
-    client.sendMessage(message.from, `Halo ${userName}! Selamat datang di layanan *Penanganan dan Pengaduan Pelecehan Seksual* :).\n\nKami siap membantu Anda untuk menemukan informasi dan sumber daya yang Anda butuhkan untuk mengatasi situasi yang mungkin Anda alami.\n\nDapatkan informasi mengenai PPKS melalui website kami: https://ppks-web.vercel.app/`);
+    client.sendMessage(message.from, `Halo ${username}! Selamat datang di layanan *Penanganan dan Pengaduan Pelecehan Seksual* :).\n\nKami siap membantu Anda untuk menemukan informasi dan sumber daya yang Anda butuhkan untuk mengatasi situasi yang mungkin Anda alami.\n\nDapatkan informasi mengenai PPKS melalui website kami: https://ppks-web.vercel.app/`);
     client.sendMessage(message.from, `Silahkan pilih layanan yang anda butuhkan:\n\n${serviceOptions.map((option, index) => `${index + 1}. ${option}`).join("\n")}`);
 
-  } else if (messageBody.startsWith('1')) { // pengaduan laporan kekerasan seksual.
-    message.react('👍');
-    message.reply(`Untuk melakukan pelaporan, silakan ketik */lapor* di kolom pesan dilanjutkan dengan deskripsi kejadian anda.\n\nAnda dapat melihat contoh laporan dengan mengetik pesan: */contoh*`);
-
-  } else if (messageBody.startsWith('/contoh')) {
-    const userContact = await message.getContact();
-    const userName = userContact.pushname;
-
-    message.react('👍');
-    message.reply(`_Contoh:_ /lapor Saya, ${userName}, melaporkan bahwa saya telah mengalami pelecehan seksual oleh seseorang pria yang saya tidak kenal. Kejadian ini terjadi pada hari senin tanggal 12 Mei 2023 di lingkungan kampus XYZ.\n(Deskripsi kejadian)...`);
-
-  } else if (messageBody.startsWith('/lapor')) {
+  } else if (messageBody.startsWith('1')) {
     const databaseService = new DatabaseService();
-    const userContact = await message.getContact();
-    const userName = userContact.pushname;
-    const userNumber = userContact.id.user;
-    const reportDescription = messageBody.slice(7);
+    const user = await message.getContact();
+    const userContact = user.id.user;
 
     try {
-      await databaseService.ValidateReportTimeDiff(userNumber);
+      await databaseService.addUserContact({ userContact });
+    } catch (error) {
+      message.reply(error.message);
+    }
 
-      await databaseService.addReport({ userName, userNumber, reportDescription });
+    message.react('👍');
+    message.reply('Masukkan usia korban. Caranya:\n\n/usia 14');
 
-      message.react('👍');
-      message.reply(`Terima kasih ${userName}, laporan anda telah dimasukkan ke dalam data satgas PPKS.\n\nJika Anda bersedia, *kami sangat-sangat menyarankan Anda untuk melakukan konseling dengan Satgas PPKS* untuk mendapatkan dukungan dan bimbingan lebih lanjut\n\nKami memastikan bahwa *semua informasi yang Anda berikan akan dijaga kerahasiaannya*. Kami berkomitmen untuk memberikan dukungan dan bimbingan dalam setiap tahap proses pengaduan dan akan memastikan bahwa Anda merasa aman dan terlindungi.`);
+  } else if (messageBody.startsWith('/usia')) {
+    const databaseService = new DatabaseService();
+    const user = await message.getContact();
+    const userContact = user.id.user;
+    const age = messageBody.slice(6);
+
+    try {
+      await databaseService.updateUserAge({ userContact, age });
+    } catch (error) {
+      message.reply(error.message);
+    }
+
+    message.react('👍');
+    message.reply('Masukkan gender korban. Caranya:\n\n/gender perempuan');
+
+  } else if (messageBody.startsWith('/gender')) {
+    const databaseService = new DatabaseService();
+    const user = await message.getContact();
+    const userContact = user.id.user;
+    const gender = messageBody.slice(8);
+
+    try {
+      await databaseService.updateUserGender({ userContact, gender });
+
+      message.reply('Masukkan deskripsi kejadian. Caranya:\n\n/deskripsi Saya ingin melaporkan bahwa seseorang telah mengalami pelecehan seksual pada hari senin tanggal 12 Mei 2023 di lingkungan kampus XYZ, ...');
+    } catch (error) {
+      message.reply(error.message);
+    }
+
+  } else if (messageBody.startsWith('/deskripsi')) {
+    const databaseService = new DatabaseService();
+    // const emailService = new EmailService();
+
+    const user = await message.getContact();
+    const userContact = user.id.user;
+    const desc = messageBody.slice(11);
+
+    try {
+      await databaseService.updateUserDescription({ userContact, desc });
+
+      const {
+        usia, jenis_kelamin, deskripsi,
+      } = await databaseService.getUserReport({ userContact });
+
+      // await emailService.sendEmail({
+      //   usia, jenis_kelamin, deskripsi,
+      // });
+
+      message.reply('Terima kasih , laporan anda telah dimasukkan ke dalam data satgas PPKS.\n\nJika Anda bersedia, *kami sangat-sangat menyarankan Anda untuk melakukan konseling dengan Satgas PPKS* untuk mendapatkan dukungan dan bimbingan lebih lanjut\n\nKami memastikan bahwa *semua informasi yang Anda berikan akan dijaga kerahasiaannya*. Kami berkomitmen untuk memberikan dukungan dan bimbingan dalam setiap tahap proses pengaduan dan akan memastikan bahwa Anda merasa aman dan terlindungi.');
     } catch (error) {
       message.reply(error.message);
     }
@@ -53,16 +93,15 @@ async function handleMessage(client, message) {
     let adminNumber = process.env.PPKS_CONTACT;
     adminNumber = adminNumber.includes('@c.us') ? adminNumber : `${adminNumber}@c.us`;
 
-    const userContact = await message.getContact();
-    console.log('userContact: ', userContact);
-    const userName = userContact.pushname;
-    const userNumber = userContact.id.user;
+    const user = await message.getContact();
+    const username = user.pushname;
+    const userContact = user.id.user;
 
-    const messageToAdmin = `Halo Tim Pusat Pelayanan Kekerasan Seksual (PPKS),\n\nSaya ingin memberitahukan bahwa ada seseorang yang mengungkapkan keinginan untuk melakukan bimbingan konseling terkait kekerasan seksual. Berikut adalah rincian informasinya:\n\nNama: ${userName}\nKontak: ${userNumber}\nKeinginan: Bimbingan Konseling\n\nMohon segera menghubungi orang tersebut untuk memberikan panduan lebih lanjut dan menjadwalkan sesi konseling. Pastikan memberikan dukungan yang sesuai, menjaga kerahasiaan informasi pribadi mereka, dan menyediakan lingkungan yang aman untuk berbagi.`;
+    const messageToAdmin = `Halo Tim Pusat Pelayanan Kekerasan Seksual (PPKS),\n\nSaya ingin memberitahukan bahwa ada seseorang yang mengungkapkan keinginan untuk melakukan bimbingan konseling terkait kekerasan seksual. Berikut adalah rincian informasinya:\n\nNama: ${username}\nKontak: ${userContact}\nKeinginan: Bimbingan Konseling\n\nMohon segera menghubungi orang tersebut untuk memberikan panduan lebih lanjut dan menjadwalkan sesi konseling. Pastikan memberikan dukungan yang sesuai, menjaga kerahasiaan informasi pribadi mereka, dan menyediakan lingkungan yang aman untuk berbagi.`;
     client.sendMessage(adminNumber, messageToAdmin);
 
     message.react('👍');
-    message.reply(`Terima kasih ${userName} telah bersedia melakukan konseling. Kami menghargai langkah yang Anda ambil untuk mencari bantuan dan mendapatkan dukungan yang Anda butuhkan. Tim Pusat Pelayanan Kekerasan Seksual (PPKS) akan segera menghubungi Anda.\n\nAnda tidak sendiri dalam perjalanan ini. Kami berkomitmen untuk memberikan dukungan yang aman, rahasia, dan mendukung Anda dalam pemulihan.`);
+    message.reply(`Terima kasih ${username} telah bersedia melakukan konseling. Kami menghargai langkah yang Anda ambil untuk mencari bantuan dan mendapatkan dukungan yang Anda butuhkan. Tim Pusat Pelayanan Kekerasan Seksual (PPKS) akan segera menghubungi Anda.\n\nAnda tidak sendiri dalam perjalanan ini. Kami berkomitmen untuk memberikan dukungan yang aman, rahasia, dan mendukung Anda dalam pemulihan.`);
 
   } else if (messageBody.startsWith('3')) { // saran dan tips untuk menghindari kekerasan seksual.
     const tipsList = [
@@ -78,39 +117,27 @@ async function handleMessage(client, message) {
     message.reply(`Berikut adalah beberapa saran dan tips yang dapat membantu Anda menghindari kekerasan seksual:\n\n${tipsList.map((option, index) => `${index + 1}. ${option}`).join("\n\n")}\n\nDapatkan informasi mengenai PPKS melalui website kami: https://ppks-web.vercel.app/`);
 
   } else if (messageBody.startsWith('4')) { // FAQ seputar kekerasan seksual.
-    const alphabet = "abcdefghijklmnopqrstuvwxyz";
     const faqList = [
-      "Apa itu kekerasan seksual?",
-      "Apa saja jenis-jenis pelecehan seksual?",
-      "Apa dampak dari kekerasan seksual?",
+      'Apa faktor risiko kekerasan seksual?',
+      'Apa peran pendidikan seksual dalam pencegahan kekerasan seksual?',
+      'Apa pentingnya pelayanan dukungan untuk korban?',
+      'Peran teknologi dalam pencegahan dan pelaporan',
+      'Pencegahan kekerasan seksual di tempat kerja',
+      'Tanda-tanda awas kekerasan seksual pada remaja',
+      'Kesetaraan gender dalam pencegahan kekerasan seksual',
+      'Tindakan hukum dalam penanganan kekerasan seksual',
     ];
 
     message.react('👍');
-    message.reply(`Daftar FAQ seputar pelecehan seksual:\n\n${faqList.map((option, index) => `${alphabet[index]}. ${option}`).join("\n")}`);
-    client.sendMessage(message.from, `Silahkan pilih daftar FAQ. Contoh "a."`);
+    message.reply(`Daftar FAQ seputar pelecehan seksual:\n\n${faqList.map((option, index) => `${index + 1}. ${option}`).join('\n')}`);
+    client.sendMessage(message.from, `Silahkan pilih daftar FAQ. Contoh "/faq1`);
 
-  } else if (messageBody.startsWith('a.')) {
+  } else if (messageBody.match(/^\/faq\d+$/)) {
     const databaseService = new DatabaseService();
-    const topic = 'definisi';
-    const answer = await databaseService.getAnswerByTopic(topic);
 
-    message.react('👍');
-    message.reply(answer);
+    const id = messageBody[4];
+    const answer = await databaseService.getAnswerById(id);
 
-  } else if (messageBody.startsWith('b.')) {
-    const databaseService = new DatabaseService();
-    const topic = 'jenis';
-    const answer = await databaseService.getAnswerByTopic(topic);
-
-    message.react('👍');
-    message.reply(answer);
-
-  } else if (messageBody.startsWith('c.')) {
-    const databaseService = new DatabaseService();
-    const topic = 'dampak';
-    const answer = await databaseService.getAnswerByTopic(topic);
-
-    message.react('👍');
     message.reply(answer);
   }
 }
