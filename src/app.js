@@ -11,8 +11,8 @@ const edgar = new Client({
   puppeteer: {
     headless: true,
     args: [
-      "--disable-gpu",
-      "--disable-dev-shm-usage",
+      // "--disable-gpu",
+      // "--disable-dev-shm-usage",
       "--disable-setuid-sandbox",
       "--no-sandbox",
     ],
@@ -24,7 +24,7 @@ edgar.on("qr", (qr) => {
   //   if (err) throw err;
   //   console.log('qr generated!');
   // });
-  qrcode.generate(qr, {small: true});
+  qrcode.generate(qr, { small: true });
 });
 
 edgar.on("ready", () => {
