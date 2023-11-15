@@ -12,7 +12,7 @@ const edgar = new Client({
     headless: true,
     args: [
       // "--disable-gpu",
-      // "--disable-dev-shm-usage",
+      "--disable-dev-shm-usage",
       "--disable-setuid-sandbox",
       "--no-sandbox",
     ],
